@@ -23,7 +23,51 @@ IntercomSettings = {
   minimumUserInfo: minimumUserInfo
 }
 
-var booted = false;
+var IntercomQueue = {
+  _isRunning: false,
+  _queue: [],
+
+  addItem: function(item) {
+    this._queue.push(item);
+    if (!this._isRunning) {
+      this._process();
+    }
+  },
+  _process: function () {
+    this._isRunning = true;
+    console.log('Checking queueu', this._queue.length, 'items');
+
+    // TODO: Should check if item.widget has been set (meaning Intercom has
+    // responded (I assume...)). If not set, return and re-run _process (with
+    // timeout). For now we just asume the general queue step timout is enough
+    // for Intercom to complete. When we've changed this we can recduce the
+    // queue step timeout.
+    // NOTES TO SELF:
+    // If user has changed - we have to Shutdown Intercom or data will be tracked
+    // to the wrong user.
+    //  if (typeof userId === 'string' && userId !== user._id) {
+    //  }
+
+    var item = this._queue.shift();
+    console.log(item);
+
+    if (item) {
+
+      // TODO: If it's the same userId and Intercom has already booted, use
+      // 'update' instead of 'shutdown' + 'boot'.
+
+      Intercom('shutdown');
+      Intercom('boot', item);
+
+      Meteor.setTimeout(function(){
+        IntercomQueue._process()
+      }, 500);
+    } else {
+      console.log('stopping queueu');
+      this._isRunning = false;
+    }
+  }
+};
 
 // send data to intercom
 Meteor.startup(function() {
@@ -39,14 +83,8 @@ Meteor.startup(function() {
         return;
     }
 
-
     if (info) {
-      var type = booted ? 'update': 'boot';
-
-      // console.log(type, info)
-      Intercom(type, info);
-
-      booted = true;
+      IntercomQueue.addItem(info);
     }
   });
 })
