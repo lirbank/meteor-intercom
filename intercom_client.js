@@ -23,17 +23,24 @@ IntercomSettings = {
   minimumUserInfo: minimumUserInfo
 }
 
+
 var IntercomQueue = {
   _isRunning: false,
   _queue: [],
+  _intercomBooted: false,
 
   addItem: function(item) {
+    var self = this;
     this._queue.push(item);
     if (!this._isRunning) {
-      this._process();
+      console.log('start quw');
+      Meteor.setTimeout( function () {
+        self._process();
+      }, 100)
     }
   },
   _process: function () {
+    var self = this;
     this._isRunning = true;
     console.log('Checking queueu', this._queue.length, 'items');
 
@@ -48,29 +55,35 @@ var IntercomQueue = {
     //  if (typeof userId === 'string' && userId !== user._id) {
     //  }
 
-    var item = this._queue.shift();
-    console.log(item);
-
-    if (item) {
-
-      // TODO: If it's the same userId and Intercom has already booted, use
-      // 'update' instead of 'shutdown' + 'boot'.
-
-      Intercom('shutdown');
-      Intercom('boot', item);
-
-      Meteor.setTimeout(function(){
-        IntercomQueue._process()
-      }, 500);
-    } else {
-      console.log('stopping queueu');
-      this._isRunning = false;
+    // if item is not set or item has completed
+    if (!item || (item && item.widget)) {
+      delete item;
+      item = this._queue.shift();
+      if (item && item.user_hash) {
+        // TODO: If it's the same userId and Intercom has already booted, use
+        // 'update' instead of 'shutdown' + 'boot'.
+        if (this._intercomBooted) {
+          Intercom('shutdown');
+          this._intercomBooted = false;
+          console.log('SHUTDOWN');
+          Meteor.setTimeout(function(){
+            console.log('BOOT', item);
+            Intercom('boot', item);
+            this._intercomBooted = true;
+          }, 100);
+        }
+      }
     }
+
+    Meteor.setTimeout(function(){
+      self._process()
+    }, 100);
   }
 };
 
 // send data to intercom
 Meteor.startup(function() {
+  /*
   Deps.autorun(function() {
     var user = Meteor.user();
     if (!user) // "log out"
@@ -87,4 +100,5 @@ Meteor.startup(function() {
       IntercomQueue.addItem(info);
     }
   });
+*/
 })
